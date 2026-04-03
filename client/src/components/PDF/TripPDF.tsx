@@ -2,7 +2,7 @@
 import { createElement } from 'react'
 import { getCategoryIcon } from '../shared/categoryIcons'
 import { FileText, Info, Clock, MapPin, Navigation, Train, Plane, Bus, Car, Ship, Coffee, Ticket, Star, Heart, Camera, Flag, Lightbulb, AlertTriangle, ShoppingBag, Bookmark } from 'lucide-react'
-import { mapsApi } from '../../api/client'
+import { accommodationsApi, mapsApi } from '../../api/client'
 import type { Trip, Day, Place, Category, AssignmentsMap, DayNotesMap } from '../../types'
 
 const NOTE_ICON_MAP = { FileText, Info, Clock, MapPin, Navigation, Train, Plane, Bus, Car, Ship, Coffee, Ticket, Star, Heart, Camera, Flag, Lightbulb, AlertTriangle, ShoppingBag, Bookmark }
@@ -115,6 +115,8 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
   const sorted = [...(days || [])].sort((a, b) => a.day_number - b.day_number)
   const range = longDateRange(sorted, loc)
   const coverImg = safeImg(trip?.cover_image)
+  //retrieve accomodations for the trip to display on the day sections and prefetch their photos if needed
+  const accomodations = await accommodationsApi.list(trip.id);
 
   // Pre-fetch place photos from Google
   const photoMap = await fetchPlacePhotos(assignments)
@@ -223,7 +225,45 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
                 ${place.notes ? `<div class="info-row"><span class="info-spacer"></span><span class="info-text muted italic">${escHtml(place.notes)}</span></div>` : ''}
               </div>
             </div>`
-        }).join('')
+      }).join('')
+
+    const accomodationsForDay = accomodations.accommodations?.filter(a =>
+      days.some(d => d.id >= a.start_day_id && d.id <= a.end_day_id && d.id === day?.id)
+    ).sort((a, b) => a.start_day_id - b.start_day_id);
+
+    const accomodationDetails = accomodationsForDay.map(item => {
+
+      const isCheckIn = day.id === item.start_day_id;
+      const isCheckOut = day.id === item.end_day_id;
+      const accomoAction = isCheckIn ? '🛎️ '+tr('reservations.meta.checkIn') 
+        : isCheckOut ? '🧳 '+tr('reservations.meta.checkOut') 
+          :  '🏨 '+tr('reservations.meta.linkAccommodation') 
+
+      const accomoEmoji = isCheckIn ? '🛎️'
+        : isCheckOut ? '🧳'
+          : ''
+
+      const accomoTime = isCheckIn ? item.check_in || 'N/A'
+        : isCheckOut ? item.check_out || 'N/A'
+          : ''
+
+      return `
+      <div class="day-accomodation">
+        <div class="day-accomodation-action">${escHtml(accomoAction)}</div>
+        ${accomoTime ? `<div class="action">${accomoEmoji} <b>${accomoTime}</b></div>` : ''}
+
+        <div class="name">🏨 ${escHtml(item.place_name)}</div>
+        ${item.place_address ? `<div class="accomodation-location">📌 ${escHtml(item.place_address)}</div>` : ''}  
+        ${item.notes ? `<div class="accomodation-note">📝 ${escHtml(item.notes)}</div>` : ''}
+    ${isCheckIn && item.confirmation ? `<div class="accomodation-booking-code">🔑 ${escHtml(item.confirmation)}</div>` : ''}
+      </div>
+      `
+    }).join('');
+
+    const accomodationsHtml = accomodationDetails ?
+      `<div class="day-accomodations-overview">
+                <div class="day-accomodations ${accomodationsForDay.length === 1 ? 'single' : ''}">${accomodationDetails}</div>
+             </div>` : '';
 
     return `
       <div class="day-section${di > 0 ? ' page-break' : ''}">
@@ -233,8 +273,8 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
           ${day.date ? `<span class="day-date">${shortDate(day.date, loc)}</span>` : ''}
           ${cost ? `<span class="day-cost">${cost}</span>` : ''}
         </div>
-        <div class="day-body">${itemsHtml}</div>
-      </div>`
+        <div class="day-body">${accomodationsHtml}${itemsHtml}</div>
+      </div>`  
   }).join('')
 
   const html = `<!DOCTYPE html>
@@ -316,6 +356,29 @@ export async function downloadTripPDF({ trip, days, places, assignments, categor
   .day-date  { font-size: 9px; color: rgba(255,255,255,0.45); }
   .day-cost  { font-size: 9px; font-weight: 600; color: rgba(255,255,255,0.65); }
   .day-body  { padding: 12px 28px 6px; }
+
+  /* Accomodation info */
+  .day-accomodations-overview {   font-size: 12px; }
+  .day-accomodations   { display: flex; flex-direction: row; justify-content: space-between; }
+  .day-accomodations.single { justify-content: center; }
+
+  .day-accomodation   {
+    width: 50%;
+    margin:10px;
+    padding:10px;
+    border:2px solid #e2e8f0;
+    border-radius: 12px;
+    justify-content: center;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .day-accomodation-action {
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 4px;
+  }
 
   /* ── Place card ────────────────────────────────── */
   .place-card {
