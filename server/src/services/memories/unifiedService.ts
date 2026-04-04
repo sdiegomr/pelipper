@@ -9,15 +9,28 @@ import {
   mapDbError,
   Selection,
 } from './helpersService';
-import { ca } from 'zod/locales';
+import { ca, fa } from 'zod/locales';
 
 
+function _providers(): Array<{id: string; enabled: boolean}> {
+  const rows = db.prepare('SELECT id, enabled FROM photo_providers').all() as Array<{id: string; enabled: number}>;
+  return rows.map(r => ({ id: r.id, enabled: r.enabled === 1 }));
+} 
 
-
-function _validProvider(provider: string): boolean {
-  const validProviders = ['immich', 'synologyphotos'];
-  return validProviders.includes(provider.toLowerCase());
+function _validProvider(provider: string): ServiceResult<string> {
+  const providers = _providers();
+  const found = providers.find(p => p.id === provider);
+  if (!found) {
+    return fail(`Provider: "${provider}" is not supported`, 400);
+  }
+  if (!found.enabled) {
+    return fail(`Provider: "${provider}" is not enabled, contact server administrator`, 400);
+  }
+  return success(provider);
 }
+
+
+
 
 export function listTripPhotos(tripId: string, userId: number): ServiceResult<any[]> {
   const access = canAccessTrip(tripId, userId);
@@ -26,6 +39,13 @@ export function listTripPhotos(tripId: string, userId: number): ServiceResult<an
   }
 
   try {
+
+    const enabledProviders = _providers().filter(p => p.enabled).map(p => p.id);
+
+    if (enabledProviders.length === 0) {
+      return fail('No photo providers enabled', 400);
+    }
+
     const photos = db.prepare(`
       SELECT tp.asset_id, tp.provider, tp.user_id, tp.shared, tp.added_at,
              u.username, u.avatar
@@ -33,8 +53,9 @@ export function listTripPhotos(tripId: string, userId: number): ServiceResult<an
       JOIN users u ON tp.user_id = u.id
       WHERE tp.trip_id = ?
         AND (tp.user_id = ? OR tp.shared = 1)
+        AND tp.provider IN (${enabledProviders.map(() => '?').join(',')})
       ORDER BY tp.added_at ASC
-    `).all(tripId, userId) as any[];
+    `).all(tripId, userId, ...enabledProviders);
 
     return success(photos);
   } catch (error) {
@@ -47,6 +68,13 @@ export function listTripAlbumLinks(tripId: string, userId: number): ServiceResul
   if (!access) {
     return fail('Trip not found or access denied', 404);
   }
+
+  
+    const enabledProviders = _providers().filter(p => p.enabled).map(p => p.id);
+
+    if (enabledProviders.length === 0) {
+      return fail('No photo providers enabled', 400);
+    }
 
   try {
     const links = db.prepare(`
@@ -63,8 +91,9 @@ export function listTripAlbumLinks(tripId: string, userId: number): ServiceResul
       FROM trip_album_links tal
       JOIN users u ON tal.user_id = u.id
       WHERE tal.trip_id = ?
+        AND tal.provider IN (${enabledProviders.map(() => '?').join(',')})
       ORDER BY tal.created_at ASC
-    `).all(tripId);
+    `).all(tripId, ...enabledProviders);
 
     return success(links);
   } catch (error) {
@@ -76,8 +105,9 @@ export function listTripAlbumLinks(tripId: string, userId: number): ServiceResul
 // managing photos in trip
 
 function _addTripPhoto(tripId: string, userId: number, provider: string, assetId: string, shared: boolean, albumLinkId?: string): ServiceResult<boolean> {
-  if (!_validProvider(provider)) {
-    return fail(`Provider: "${provider}" is not supported`, 400);
+  const providerResult = _validProvider(provider);
+  if (!providerResult.success) {
+    return providerResult as ServiceResult<boolean>;
   }
   try {
     const result = db.prepare(
@@ -109,8 +139,9 @@ export async function addTripPhotos(
 
   let added = 0;
   for (const selection of selections) {
-    if (!_validProvider(selection.provider)) {
-      return fail(`Provider: "${selection.provider}" is not supported`, 400);
+    const providerResult = _validProvider(selection.provider);
+    if (!providerResult.success) {
+      return providerResult as ServiceResult<{ added: number; shared: boolean }>;
     }
     for (const raw of selection.asset_ids) {
       const assetId = String(raw || '').trim();
@@ -212,8 +243,9 @@ export function createTripAlbumLink(tripId: string, userId: number, providerRaw:
   }
 
 
-  if (!_validProvider(provider)) {
-    return fail(`Provider: "${provider}" is not supported`, 400);
+  const providerResult = _validProvider(provider);
+  if (!providerResult.success) {
+    return providerResult as ServiceResult<true>;
   }
 
   try {
