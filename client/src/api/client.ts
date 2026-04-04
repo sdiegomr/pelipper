@@ -27,7 +27,8 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && (error.response?.data as { code?: string } | undefined)?.code === 'AUTH_REQUIRED') {
       if (!window.location.pathname.includes('/login') && !window.location.pathname.includes('/register') && !window.location.pathname.startsWith('/shared/')) {
-        window.location.href = '/login'
+        const currentPath = window.location.pathname + window.location.search
+        window.location.href = '/login?redirect=' + encodeURIComponent(currentPath)
       }
     }
     if (
@@ -197,6 +198,8 @@ export const adminApi = {
   rotateJwtSecret: () => apiClient.post('/admin/rotate-jwt-secret').then(r => r.data),
   sendTestNotification: (data: Record<string, unknown>) =>
     apiClient.post('/admin/dev/test-notification', data).then(r => r.data),
+  getNotificationPreferences: () => apiClient.get('/admin/notification-preferences').then(r => r.data),
+  updateNotificationPreferences: (prefs: Record<string, Record<string, boolean>>) => apiClient.put('/admin/notification-preferences', prefs).then(r => r.data),
 }
 
 export const addonsApi = {
@@ -326,9 +329,9 @@ export const shareApi = {
 
 export const notificationsApi = {
   getPreferences: () => apiClient.get('/notifications/preferences').then(r => r.data),
-  updatePreferences: (prefs: Record<string, boolean>) => apiClient.put('/notifications/preferences', prefs).then(r => r.data),
+  updatePreferences: (prefs: Record<string, Record<string, boolean>>) => apiClient.put('/notifications/preferences', prefs).then(r => r.data),
   testSmtp: (email?: string) => apiClient.post('/notifications/test-smtp', { email }).then(r => r.data),
-  testWebhook: () => apiClient.post('/notifications/test-webhook').then(r => r.data),
+  testWebhook: (url: string) => apiClient.post('/notifications/test-webhook', { url }).then(r => r.data),
 }
 
 export const inAppNotificationsApi = {

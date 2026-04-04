@@ -224,13 +224,10 @@ router.put('/category-assignees/:categoryName', authenticate, (req: Request, res
 
   // Notify newly assigned users
   if (Array.isArray(user_ids) && user_ids.length > 0) {
-    import('../services/notifications').then(({ notify }) => {
+    import('../services/notificationService').then(({ send }) => {
       const tripInfo = db.prepare('SELECT title FROM trips WHERE id = ?').get(tripId) as { title: string } | undefined;
-      for (const uid of user_ids) {
-        if (uid !== authReq.user.id) {
-          notify({ userId: uid, event: 'packing_tagged', params: { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, category: cat } }).catch(() => {});
-        }
-      }
+      // Use trip scope so the service resolves recipients — actor is excluded automatically
+      send({ event: 'packing_tagged', actorId: authReq.user.id, scope: 'trip', targetId: Number(tripId), params: { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, category: cat, tripId: String(tripId) } }).catch(() => {});
     });
   }
 });

@@ -418,6 +418,15 @@ function createTables(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id, is_read, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_notifications_recipient_created ON notifications(recipient_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS notification_channel_preferences (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL,
+      channel TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      PRIMARY KEY (user_id, event_type, channel)
+    );
+    CREATE INDEX IF NOT EXISTS idx_ncp_user ON notification_channel_preferences(user_id);
   `);
 }
 

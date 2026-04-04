@@ -480,3 +480,29 @@ export function createInviteToken(
   ).run(token, overrides.max_uses ?? 1, overrides.expires_at ?? null, createdBy);
   return db.prepare('SELECT * FROM invite_tokens WHERE id = ?').get(result.lastInsertRowid) as TestInviteToken;
 }
+
+// ---------------------------------------------------------------------------
+// Notification helpers
+// ---------------------------------------------------------------------------
+
+/** Upsert a key/value pair into app_settings. */
+export function setAppSetting(db: Database.Database, key: string, value: string): void {
+  db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(key, value);
+}
+
+/** Set the active notification channels (e.g. 'email', 'webhook', 'email,webhook', 'none'). */
+export function setNotificationChannels(db: Database.Database, channels: string): void {
+  setAppSetting(db, 'notification_channels', channels);
+}
+
+/** Explicitly disable a per-user notification preference for a given event+channel combo. */
+export function disableNotificationPref(
+  db: Database.Database,
+  userId: number,
+  eventType: string,
+  channel: string
+): void {
+  db.prepare(
+    'INSERT OR REPLACE INTO notification_channel_preferences (user_id, event_type, channel, enabled) VALUES (?, ?, ?, 0)'
+  ).run(userId, eventType, channel);
+}
