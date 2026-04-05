@@ -12,22 +12,19 @@ import {
   deleteAll,
   respondToBoolean,
 } from '../services/inAppNotifications';
-import * as prefsService from '../services/notificationPreferencesService';
+import { getPreferencesMatrix, setPreferences } from '../services/notificationPreferencesService';
 
 const router = express.Router();
 
 router.get('/preferences', authenticate, (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  res.json({ preferences: prefsService.getPreferences(authReq.user.id) });
+  res.json(getPreferencesMatrix(authReq.user.id, authReq.user.role, 'user'));
 });
 
 router.put('/preferences', authenticate, (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  const { notify_trip_invite, notify_booking_change, notify_trip_reminder, notify_webhook } = req.body;
-  const preferences = prefsService.updatePreferences(authReq.user.id, {
-    notify_trip_invite, notify_booking_change, notify_trip_reminder, notify_webhook
-  });
-  res.json({ preferences });
+  setPreferences(authReq.user.id, req.body);
+  res.json(getPreferencesMatrix(authReq.user.id, authReq.user.role, 'user'));
 });
 
 router.post('/test-smtp', authenticate, async (req: Request, res: Response) => {
@@ -38,9 +35,10 @@ router.post('/test-smtp', authenticate, async (req: Request, res: Response) => {
 });
 
 router.post('/test-webhook', authenticate, async (req: Request, res: Response) => {
-  const authReq = req as AuthRequest;
-  if (authReq.user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-  res.json(await testWebhook());
+  const { url } = req.body;
+  if (!url || typeof url !== 'string') return res.status(400).json({ error: 'url is required' });
+  try { new URL(url); } catch { return res.status(400).json({ error: 'Invalid URL' }); }
+  res.json(await testWebhook(url));
 });
 
 // ── In-app notifications ──────────────────────────────────────────────────────

@@ -69,9 +69,9 @@ router.post('/', authenticate, (req: Request, res: Response) => {
   broadcast(tripId, 'reservation:created', { reservation }, req.headers['x-socket-id'] as string);
 
   // Notify trip members about new booking
-  import('../services/notifications').then(({ notifyTripMembers }) => {
+  import('../services/notificationService').then(({ send }) => {
     const tripInfo = db.prepare('SELECT title FROM trips WHERE id = ?').get(tripId) as { title: string } | undefined;
-    notifyTripMembers(Number(tripId), authReq.user.id, 'booking_change', { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, booking: title, type: type || 'booking' }).catch(() => {});
+    send({ event: 'booking_change', actorId: authReq.user.id, scope: 'trip', targetId: Number(tripId), params: { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, booking: title, type: type || 'booking', tripId: String(tripId) } }).catch(() => {});
   });
 });
 
@@ -137,9 +137,9 @@ router.put('/:id', authenticate, (req: Request, res: Response) => {
   res.json({ reservation });
   broadcast(tripId, 'reservation:updated', { reservation }, req.headers['x-socket-id'] as string);
 
-  import('../services/notifications').then(({ notifyTripMembers }) => {
+  import('../services/notificationService').then(({ send }) => {
     const tripInfo = db.prepare('SELECT title FROM trips WHERE id = ?').get(tripId) as { title: string } | undefined;
-    notifyTripMembers(Number(tripId), authReq.user.id, 'booking_change', { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, booking: title || current.title, type: type || current.type || 'booking' }).catch(() => {});
+    send({ event: 'booking_change', actorId: authReq.user.id, scope: 'trip', targetId: Number(tripId), params: { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, booking: title || current.title, type: type || current.type || 'booking', tripId: String(tripId) } }).catch(() => {});
   });
 });
 
@@ -163,9 +163,9 @@ router.delete('/:id', authenticate, (req: Request, res: Response) => {
   res.json({ success: true });
   broadcast(tripId, 'reservation:deleted', { reservationId: Number(id) }, req.headers['x-socket-id'] as string);
 
-  import('../services/notifications').then(({ notifyTripMembers }) => {
+  import('../services/notificationService').then(({ send }) => {
     const tripInfo = db.prepare('SELECT title FROM trips WHERE id = ?').get(tripId) as { title: string } | undefined;
-    notifyTripMembers(Number(tripId), authReq.user.id, 'booking_change', { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, booking: reservation.title, type: reservation.type || 'booking' }).catch(() => {});
+    send({ event: 'booking_change', actorId: authReq.user.id, scope: 'trip', targetId: Number(tripId), params: { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, booking: reservation.title, type: reservation.type || 'booking', tripId: String(tripId) } }).catch(() => {});
   });
 });
 

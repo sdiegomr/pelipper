@@ -114,9 +114,9 @@ router.post('/trips/:tripId/photos', authenticate, (req: Request, res: Response)
 
   // Notify trip members about shared photos
   if (shared && added > 0) {
-    import('../services/notifications').then(({ notifyTripMembers }) => {
+    import('../services/notificationService').then(({ send }) => {
       const tripInfo = db.prepare('SELECT title FROM trips WHERE id = ?').get(tripId) as { title: string } | undefined;
-      notifyTripMembers(Number(tripId), authReq.user.id, 'photos_shared', { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, count: String(added) }).catch(() => {});
+      send({ event: 'photos_shared', actorId: authReq.user.id, scope: 'trip', targetId: Number(tripId), params: { trip: tripInfo?.title || 'Untitled', actor: authReq.user.email, count: String(added), tripId: String(tripId) } }).catch(() => {});
     });
   }
 });

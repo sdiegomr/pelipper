@@ -412,8 +412,8 @@ router.post('/:id/members', authenticate, (req: Request, res: Response) => {
     const result = addMember(req.params.id, identifier, tripOwnerId, authReq.user.id);
 
     // Notify invited user
-    import('../services/notifications').then(({ notify }) => {
-      notify({ userId: result.targetUserId, event: 'trip_invite', params: { trip: result.tripTitle, actor: authReq.user.email, invitee: result.member.email } }).catch(() => {});
+    import('../services/notificationService').then(({ send }) => {
+      send({ event: 'trip_invite', actorId: authReq.user.id, scope: 'user', targetId: result.targetUserId, params: { trip: result.tripTitle, actor: authReq.user.email, invitee: result.member.email, tripId: String(req.params.id) } }).catch(() => {});
     });
 
     res.status(201).json({ member: result.member });

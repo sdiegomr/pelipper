@@ -56,6 +56,7 @@ const RESET_TABLES = [
   'vacay_plans',
   'atlas_visited_countries',
   'atlas_bucket_list',
+  'notification_channel_preferences',
   'notifications',
   'audit_log',
   'user_settings',

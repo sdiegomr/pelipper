@@ -1,4 +1,7 @@
 import { db } from '../db/database';
+import { maybe_encrypt_api_key } from './apiKeyCrypto';
+
+const ENCRYPTED_SETTING_KEYS = new Set(['webhook_url']);
 
 export function getUserSettings(userId: number): Record<string, unknown> {
   const rows = db.prepare('SELECT key, value FROM settings WHERE user_id = ?').all(userId) as { key: string; value: string }[];
@@ -13,12 +16,17 @@ export function getUserSettings(userId: number): Record<string, unknown> {
   return settings;
 }
 
+function serializeValue(key: string, value: unknown): string {
+  const raw = typeof value === 'object' ? JSON.stringify(value) : String(value !== undefined ? value : '');
+  if (ENCRYPTED_SETTING_KEYS.has(key)) return maybe_encrypt_api_key(raw) ?? raw;
+  return raw;
+}
+
 export function upsertSetting(userId: number, key: string, value: unknown) {
-  const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value !== undefined ? value : '');
   db.prepare(`
     INSERT INTO settings (user_id, key, value) VALUES (?, ?, ?)
     ON CONFLICT(user_id, key) DO UPDATE SET value = excluded.value
-  `).run(userId, key, serialized);
+  `).run(userId, key, serializeValue(key, value));
 }
 
 export function bulkUpsertSettings(userId: number, settings: Record<string, unknown>) {
@@ -29,8 +37,7 @@ export function bulkUpsertSettings(userId: number, settings: Record<string, unkn
   db.exec('BEGIN');
   try {
     for (const [key, value] of Object.entries(settings)) {
-      const serialized = typeof value === 'object' ? JSON.stringify(value) : String(value !== undefined ? value : '');
-      upsert.run(userId, key, serialized);
+      upsert.run(userId, key, serializeValue(key, value));
     }
     db.exec('COMMIT');
   } catch (err) {

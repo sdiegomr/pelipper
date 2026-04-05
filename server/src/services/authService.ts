@@ -31,9 +31,7 @@ const MFA_BACKUP_CODE_COUNT = 10;
 const ADMIN_SETTINGS_KEYS = [
   'allow_registration', 'allowed_file_types', 'require_mfa',
   'smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass', 'smtp_from', 'smtp_skip_tls_verify',
-  'notification_webhook_url', 'notification_channel',
-  'notify_trip_invite', 'notify_booking_change', 'notify_trip_reminder',
-  'notify_vacay_invite', 'notify_photos_shared', 'notify_collab_message', 'notify_packing_tagged',
+  'notification_channels', 'admin_webhook_url',
 ];
 
 const avatarDir = path.join(__dirname, '../../uploads/avatars');
@@ -195,8 +193,10 @@ export function getAppConfig(authenticatedUser: { id: number } | null) {
   const notifChannel = (db.prepare("SELECT value FROM app_settings WHERE key = 'notification_channel'").get() as { value: string } | undefined)?.value || 'none';
   const tripReminderSetting = (db.prepare("SELECT value FROM app_settings WHERE key = 'notify_trip_reminder'").get() as { value: string } | undefined)?.value;
   const hasSmtpHost = !!(process.env.SMTP_HOST || (db.prepare("SELECT value FROM app_settings WHERE key = 'smtp_host'").get() as { value: string } | undefined)?.value);
-  const hasWebhookUrl = !!(process.env.NOTIFICATION_WEBHOOK_URL || (db.prepare("SELECT value FROM app_settings WHERE key = 'notification_webhook_url'").get() as { value: string } | undefined)?.value);
-  const channelConfigured = (notifChannel === 'email' && hasSmtpHost) || (notifChannel === 'webhook' && hasWebhookUrl);
+  const notifChannelsRaw = (db.prepare("SELECT value FROM app_settings WHERE key = 'notification_channels'").get() as { value: string } | undefined)?.value || notifChannel;
+  const activeChannels = notifChannelsRaw === 'none' ? [] : notifChannelsRaw.split(',').map((c: string) => c.trim()).filter(Boolean);
+  const hasWebhookEnabled = activeChannels.includes('webhook');
+  const channelConfigured = (activeChannels.includes('email') && hasSmtpHost) || hasWebhookEnabled;
   const tripRemindersEnabled = channelConfigured && tripReminderSetting !== 'false';
   const setupComplete = userCount > 0 && !(db.prepare("SELECT id FROM users WHERE role = 'admin' AND must_change_password = 1 LIMIT 1").get());
 
@@ -216,6 +216,8 @@ export function getAppConfig(authenticatedUser: { id: number } | null) {
     demo_password: isDemo ? 'demo12345' : undefined,
     timezone: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     notification_channel: notifChannel,
+    notification_channels: activeChannels,
+    available_channels: { email: hasSmtpHost, webhook: hasWebhookEnabled, inapp: true },
     trip_reminders_enabled: tripRemindersEnabled,
     permissions: authenticatedUser ? getAllPermissions() : undefined,
     dev_mode: process.env.NODE_ENV === 'development',
@@ -714,6 +716,7 @@ export function updateAppSettings(
       }
       if (key === 'smtp_pass' && val === '••••••••') continue;
       if (key === 'smtp_pass') val = encrypt_api_key(val);
+      if (key === 'admin_webhook_url' && val) val = maybe_encrypt_api_key(val) ?? val;
       db.prepare("INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)").run(key, val);
     }
   }
@@ -722,11 +725,9 @@ export function updateAppSettings(
 
   const summary: Record<string, unknown> = {};
   const smtpChanged = changedKeys.some(k => k.startsWith('smtp_'));
-  const eventsChanged = changedKeys.some(k => k.startsWith('notify_'));
-  if (changedKeys.includes('notification_channel')) summary.notification_channel = body.notification_channel;
-  if (changedKeys.includes('notification_webhook_url')) summary.webhook_url_updated = true;
+  if (changedKeys.includes('notification_channels')) summary.notification_channels = body.notification_channels;
+  if (changedKeys.includes('admin_webhook_url')) summary.admin_webhook_url_updated = true;
   if (smtpChanged) summary.smtp_settings_updated = true;
-  if (eventsChanged) summary.notification_events_updated = true;
   if (changedKeys.includes('allow_registration')) summary.allow_registration = body.allow_registration;
   if (changedKeys.includes('allowed_file_types')) summary.allowed_file_types_updated = true;
   if (changedKeys.includes('require_mfa')) summary.require_mfa = body.require_mfa;
@@ -736,7 +737,7 @@ export function updateAppSettings(
     debugDetails[k] = k === 'smtp_pass' ? '***' : body[k];
   }
 
-  const notifRelated = ['notification_channel', 'notification_webhook_url', 'smtp_host', 'notify_trip_reminder'];
+  const notifRelated = ['notification_channels', 'smtp_host'];
   const shouldRestartScheduler = changedKeys.some(k => notifRelated.includes(k));
   if (shouldRestartScheduler) {
     startTripReminders();
