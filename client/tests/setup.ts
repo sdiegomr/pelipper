@@ -59,11 +59,15 @@ globalThis.ResizeObserver = vi.fn().mockImplementation(() => ({
   disconnect: vi.fn(),
 })) as unknown as typeof ResizeObserver;
 
-// URL.createObjectURL / revokeObjectURL — in jsdom, modules access globals
-// through window.URL (not globalThis.URL — these are different objects on CI).
-// Targeting window.URL is required so the mock is visible to source modules.
-Object.defineProperty(window.URL, 'createObjectURL', { writable: true, configurable: true, value: vi.fn(() => 'blob:mock') });
-Object.defineProperty(window.URL, 'revokeObjectURL', { writable: true, configurable: true, value: vi.fn() });
+// URL.createObjectURL / revokeObjectURL — Node 22 URL.createObjectURL requires
+// a native node:buffer Blob; passing a jsdom Blob throws ERR_INVALID_ARG_TYPE.
+// Tests that need blob URLs should mock fetch to return node:buffer Blobs so
+// the real URL.createObjectURL works. For tests that only need the method to
+// exist without returning a real URL, stub it here as a vi.fn fallback.
+if (typeof URL.createObjectURL === 'undefined') {
+  Object.defineProperty(URL, 'createObjectURL', { writable: true, configurable: true, value: vi.fn(() => 'blob:mock') });
+  Object.defineProperty(URL, 'revokeObjectURL', { writable: true, configurable: true, value: vi.fn() });
+}
 
 // Element.prototype.scrollIntoView — jsdom doesn't implement it
 Element.prototype.scrollIntoView = vi.fn();

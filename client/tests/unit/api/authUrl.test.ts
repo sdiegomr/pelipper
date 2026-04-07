@@ -8,8 +8,7 @@ const flushPromises = () => new Promise<void>(r => setTimeout(r, 10));
 
 beforeEach(() => {
   clearImageQueue();
-  vi.restoreAllMocks(); // remove vi.spyOn() wrappers, restoring to the setup.ts vi.fn()
-  vi.clearAllMocks();   // reset accumulated call counts on window.URL mocks from setup.ts
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -82,15 +81,16 @@ describe('fetchImageAsBlob', () => {
 
   describe('FE-COMP-AUTHURL-007: successful fetch returns blob object URL', () => {
     it('resolves to a blob URL for a valid image response', async () => {
-      server.use(
-        http.get('/uploads/photo.jpg', () =>
-          new HttpResponse(new Blob(['fake-image'], { type: 'image/jpeg' }), {
-            status: 200,
-          })
-        )
-      );
+      // Node 22 URL.createObjectURL requires a native node:buffer Blob, not a
+      // jsdom Blob — passing the wrong type throws ERR_INVALID_ARG_TYPE (caught,
+      // returns ''). Mock fetch directly with a Node Blob so the real
+      // URL.createObjectURL works without any mocking needed.
+      const { Blob: NodeBlob } = await import('node:buffer');
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(new NodeBlob(['fake-image'], { type: 'image/jpeg' }) as unknown as Blob),
+      } as unknown as Response);
       const result = await fetchImageAsBlob('/uploads/photo.jpg');
-      // URL.createObjectURL is native in Node 20+; just assert it's a blob URL
       expect(result).toMatch(/^blob:/);
     });
   });
@@ -159,10 +159,14 @@ describe('fetchImageAsBlob', () => {
   describe('FE-COMP-AUTHURL-011: queued request runs after active slot frees', () => {
     it('7th request eventually resolves once one of the 6 active slots is freed', async () => {
       const resolvers: Array<() => void> = [];
+      const { Blob: NodeBlob } = await import('node:buffer');
 
       vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
         await new Promise<void>(r => resolvers.push(r));
-        return new Response(new Blob(['img'], { type: 'image/jpeg' }), { status: 200 });
+        return {
+          ok: true,
+          blob: () => Promise.resolve(new NodeBlob(['img'], { type: 'image/jpeg' }) as unknown as Blob),
+        } as unknown as Response;
       });
 
       const urls = Array.from({ length: 7 }, (_, i) => `/uploads/queue${i}.jpg`);
@@ -194,11 +198,19 @@ describe('clearImageQueue', () => {
   describe('FE-COMP-AUTHURL-012: clearImageQueue discards pending entries', () => {
     it('removes queued items so they never execute after active slots drain', async () => {
       const resolvers: Array<() => void> = [];
-      const createObjectURLSpy = vi.spyOn(window.URL, 'createObjectURL');
+      // Track completions via fetch mock instead of URL.createObjectURL spy —
+      // URL.createObjectURL is a Node built-in whose identity varies across
+      // Node versions, making it unreliable to spy on in jsdom tests on CI.
+      let completedFetches = 0;
+      const { Blob: NodeBlob } = await import('node:buffer');
 
       vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
         await new Promise<void>(r => resolvers.push(r));
-        return new Response(new Blob(['img'], { type: 'image/jpeg' }), { status: 200 });
+        completedFetches++;
+        return {
+          ok: true,
+          blob: () => Promise.resolve(new NodeBlob(['img'], { type: 'image/jpeg' }) as unknown as Blob),
+        } as unknown as Response;
       });
 
       const urls = Array.from({ length: 7 }, (_, i) => `/uploads/clear${i}.jpg`);
@@ -215,7 +227,7 @@ describe('clearImageQueue', () => {
       await flushPromises();
 
       // 6 active slots completed; queue was cleared so the 7th never ran
-      expect(createObjectURLSpy).toHaveBeenCalledTimes(6);
+      expect(completedFetches).toBe(6);
 
       // First 6 promises resolved; 7th is orphaned (never resolves)
       await Promise.all(promises.slice(0, 6));
