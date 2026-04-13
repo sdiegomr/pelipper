@@ -1004,7 +1004,7 @@ function VerdictSection({ pros, cons }: { pros: string[]; cons: string[] }) {
       >
         <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
         <span className="text-[10px] font-bold tracking-[0.14em] uppercase text-zinc-400 flex items-center gap-1.5">
-          Pros & Cons
+          {t('journey.editor.prosCons')}
           <ChevronDown
             size={12}
             className={`md:hidden text-zinc-400 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
@@ -1042,12 +1042,12 @@ function VerdictSection({ pros, cons }: { pros: string[]; cons: string[] }) {
         }`}
       >
         {pros.length > 0 && (
-          <div className="rounded-xl border border-green-200 dark:border-green-800/30 p-4" style={{ background: 'linear-gradient(180deg, #F0FDF4 0%, white 100%)' }}>
+          <div className="rounded-xl border border-green-200 dark:border-green-800/30 p-4 bg-gradient-to-b from-green-50 to-white dark:from-green-950/30 dark:to-zinc-900">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-6 h-6 rounded-lg bg-green-500 flex items-center justify-center">
                 <Check size={14} className="text-white" strokeWidth={3} />
               </div>
-              <span className="hidden md:inline text-[11px] font-bold tracking-[0.1em] uppercase text-green-700">{t('journey.verdict.lovedIt')}</span>
+              <span className="hidden md:inline text-[11px] font-bold tracking-[0.1em] uppercase text-green-700 dark:text-green-400">{t('journey.verdict.lovedIt')}</span>
               <span className="ml-auto text-[11px] font-semibold text-green-600">{pros.length}</span>
             </div>
             <div className="flex flex-col gap-2">
@@ -1061,12 +1061,12 @@ function VerdictSection({ pros, cons }: { pros: string[]; cons: string[] }) {
           </div>
         )}
         {cons.length > 0 && (
-          <div className="rounded-xl border border-red-200 dark:border-red-800/30 p-4" style={{ background: 'linear-gradient(180deg, #FEF2F2 0%, white 100%)' }}>
+          <div className="rounded-xl border border-red-200 dark:border-red-800/30 p-4 bg-gradient-to-b from-red-50 to-white dark:from-red-950/30 dark:to-zinc-900">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-6 h-6 rounded-lg bg-red-500 flex items-center justify-center">
                 <Minus size={14} className="text-white" strokeWidth={3} />
               </div>
-              <span className="hidden md:inline text-[11px] font-bold tracking-[0.1em] uppercase text-red-700">{t('journey.verdict.couldBeBetter')}</span>
+              <span className="hidden md:inline text-[11px] font-bold tracking-[0.1em] uppercase text-red-700 dark:text-red-400">{t('journey.verdict.couldBeBetter')}</span>
               <span className="ml-auto text-[11px] font-semibold text-red-600">{cons.length}</span>
             </div>
             <div className="flex flex-col gap-2">
