@@ -64,14 +64,14 @@ router.get('/available-trips', authenticate, (req: Request, res: Response) => {
 
 router.patch('/entries/:entryId', authenticate, (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  const result = svc.updateEntry(Number(req.params.entryId), authReq.user.id, req.body || {});
+  const result = svc.updateEntry(Number(req.params.entryId), authReq.user.id, req.body || {}, req.headers['x-socket-id'] as string);
   if (!result) return res.status(404).json({ error: 'Entry not found' });
   res.json(result);
 });
 
 router.delete('/entries/:entryId', authenticate, (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  if (!svc.deleteEntry(Number(req.params.entryId), authReq.user.id)) {
+  if (!svc.deleteEntry(Number(req.params.entryId), authReq.user.id, req.headers['x-socket-id'] as string)) {
     return res.status(404).json({ error: 'Entry not found' });
   }
   res.json({ success: true });
@@ -245,7 +245,7 @@ router.post('/:id/entries', authenticate, (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
   const { entry_date } = req.body || {};
   if (!entry_date) return res.status(400).json({ error: 'entry_date is required' });
-  const entry = svc.createEntry(Number(req.params.id), authReq.user.id, req.body);
+  const entry = svc.createEntry(Number(req.params.id), authReq.user.id, req.body, req.headers['x-socket-id'] as string);
   if (!entry) return res.status(404).json({ error: 'Journey not found' });
   res.status(201).json(entry);
 });

@@ -14,7 +14,7 @@ const JP_SELECT = `
 `;
 const JP_JOIN = 'journey_photos jp JOIN trek_photos tkp ON tkp.id = jp.photo_id';
 
-function broadcastJourneyEvent(journeyId: number, event: string, data: Record<string, unknown>, excludeUserId?: number) {
+function broadcastJourneyEvent(journeyId: number, event: string, data: Record<string, unknown>, excludeSocketId?: string | number) {
   const contributors = db.prepare(
     'SELECT user_id FROM journey_contributors WHERE journey_id = ?'
   ).all(journeyId) as { user_id: number }[];
@@ -24,8 +24,7 @@ function broadcastJourneyEvent(journeyId: number, event: string, data: Record<st
   if (owner) userIds.add(owner.user_id);
 
   for (const uid of userIds) {
-    if (uid === excludeUserId) continue;
-    broadcastToUser(uid, { type: event, journeyId, ...data });
+    broadcastToUser(uid, { type: event, journeyId, ...data }, excludeSocketId);
   }
 }
 
@@ -218,7 +217,7 @@ export function addTripToJourney(journeyId: number, tripId: number, userId: numb
   syncTripPlaces(journeyId, tripId, userId);
   // import existing trip photos (Immich/Synology) with sharing settings
   syncTripPhotos(journeyId, tripId);
-  broadcastJourneyEvent(journeyId, 'journey:trip:synced', { tripId }, userId);
+  broadcastJourneyEvent(journeyId, 'journey:trip:synced', { tripId });
   return true;
 }
 
@@ -465,7 +464,7 @@ export function createEntry(journeyId: number, userId: number, data: {
   tags?: string[];
   pros_cons?: { pros: string[]; cons: string[] };
   visibility?: string;
-}): JourneyEntry | null {
+}, sid?: string): JourneyEntry | null {
   if (!canEdit(journeyId, userId)) return null;
 
   const now = ts();
@@ -499,7 +498,7 @@ export function createEntry(journeyId: number, userId: number, data: {
   );
 
   const created = db.prepare('SELECT * FROM journey_entries WHERE id = ?').get(Number(res.lastInsertRowid)) as JourneyEntry;
-  broadcastJourneyEvent(journeyId, 'journey:entry:created', { entry: created }, userId);
+  broadcastJourneyEvent(journeyId, 'journey:entry:created', { entry: created }, sid);
   return created;
 }
 
@@ -518,7 +517,7 @@ export function updateEntry(entryId: number, userId: number, data: Partial<{
   pros_cons: { pros: string[]; cons: string[] };
   visibility: string;
   sort_order: number;
-}>): JourneyEntry | null {
+}>, sid?: string): JourneyEntry | null {
   const entry = db.prepare('SELECT * FROM journey_entries WHERE id = ?').get(entryId) as JourneyEntry | undefined;
   if (!entry) return null;
   if (!canEdit(entry.journey_id, userId)) return null;
@@ -557,11 +556,11 @@ export function updateEntry(entryId: number, userId: number, data: Partial<{
   db.prepare('UPDATE journeys SET updated_at = ? WHERE id = ?').run(ts(), entry.journey_id);
 
   const updated = db.prepare('SELECT * FROM journey_entries WHERE id = ?').get(entryId) as JourneyEntry;
-  broadcastJourneyEvent(entry.journey_id, 'journey:entry:updated', { entry: updated }, userId);
+  broadcastJourneyEvent(entry.journey_id, 'journey:entry:updated', { entry: updated }, sid);
   return updated;
 }
 
-export function deleteEntry(entryId: number, userId: number): boolean {
+export function deleteEntry(entryId: number, userId: number, sid?: string): boolean {
   const entry = db.prepare('SELECT * FROM journey_entries WHERE id = ?').get(entryId) as JourneyEntry | undefined;
   if (!entry) return false;
   if (!canEdit(entry.journey_id, userId)) return false;
@@ -576,7 +575,7 @@ export function deleteEntry(entryId: number, userId: number): boolean {
     AND id NOT IN (SELECT DISTINCT entry_id FROM journey_photos)
   `).run(entry.journey_id);
 
-  broadcastJourneyEvent(entry.journey_id, 'journey:entry:deleted', { entryId }, userId);
+  broadcastJourneyEvent(entry.journey_id, 'journey:entry:deleted', { entryId }, sid);
   return true;
 }
 

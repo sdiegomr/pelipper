@@ -79,7 +79,7 @@ export default function JourneyDetailPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const { t } = useTranslation()
-  const { current, loading, loadJourney, updateEntry, deleteEntry, uploadPhotos, deletePhoto } = useJourneyStore()
+  const { current, loading, notFound, loadJourney, updateEntry, deleteEntry, uploadPhotos, deletePhoto } = useJourneyStore()
   const mapRef = useRef<JourneyMapHandle>(null)
   const fullMapRef = useRef<JourneyMapHandle>(null)
   const [activeLocationId, setActiveLocationId] = useState<string | null>(null)
@@ -96,6 +96,13 @@ export default function JourneyDetailPage() {
   useEffect(() => {
     if (id) loadJourney(Number(id))
   }, [id])
+
+  useEffect(() => {
+    if (notFound) {
+      toast.error(t('journey.notFound'))
+      navigate('/journey')
+    }
+  }, [notFound])
 
   // WebSocket real-time updates
   useEffect(() => {

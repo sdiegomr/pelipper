@@ -88,6 +88,7 @@ interface JourneyState {
   journeys: Journey[]
   current: JourneyDetail | null
   loading: boolean
+  notFound: boolean
 
   loadJourneys: () => Promise<void>
   loadJourney: (id: number) => Promise<void>
@@ -109,6 +110,7 @@ export const useJourneyStore = create<JourneyState>((set, get) => ({
   journeys: [],
   current: null,
   loading: false,
+  notFound: false,
 
   loadJourneys: async () => {
     set({ loading: true })
@@ -121,10 +123,14 @@ export const useJourneyStore = create<JourneyState>((set, get) => ({
   },
 
   loadJourney: async (id) => {
-    set({ loading: true })
+    set({ loading: true, notFound: false })
     try {
       const data = await journeyApi.get(id)
       set({ current: data })
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        set({ current: null, notFound: true })
+      }
     } finally {
       set({ loading: false })
     }
