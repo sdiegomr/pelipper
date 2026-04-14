@@ -32,6 +32,7 @@ import { useTripWebSocket } from '../hooks/useTripWebSocket'
 import { useRouteCalculation } from '../hooks/useRouteCalculation'
 import { usePlaceSelection } from '../hooks/usePlaceSelection'
 import { usePlannerHistory } from '../hooks/usePlannerHistory'
+import { PelipperLoader } from '../components/PelipperLoader'
 import type { Accommodation, TripMember, Day, Place, Reservation, PackingItem, TodoItem } from '../types'
 import { ListTodo } from 'lucide-react'
 
@@ -516,12 +517,7 @@ export default function TripPlannerPage(): React.ReactElement | null {
           }
         `}</style>
         <div style={{ marginBottom: 28 }}>
-          <img
-            src={document.documentElement.classList.contains('dark') ? '/icons/trek-loading-light.gif' : '/icons/trek-loading-dark.gif'}
-            alt="Loading"
-            width={64}
-            height={64}
-          />
+          <PelipperLoader size={120} darkMode={document.documentElement.classList.contains('dark')} />
         </div>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.3px', marginBottom: 6, animation: 'fadeInUp 0.5s ease-out' }}>
           {trip?.title || 'TREK'}
