@@ -12,6 +12,7 @@ import VacayPage from './pages/VacayPage'
 import AtlasPage from './pages/AtlasPage'
 import SharedTripPage from './pages/SharedTripPage'
 import InAppNotificationsPage from './pages/InAppNotificationsPage.tsx'
+import FlightSearchPage from './pages/FlightSearchPage'
 import { ToastContainer } from './components/shared/Toast'
 import { TranslationProvider, useTranslation } from './i18n'
 import { authApi } from './api/client'
@@ -224,6 +225,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <InAppNotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/flights"
+          element={
+            <ProtectedRoute>
+              <FlightSearchPage />
             </ProtectedRoute>
           }
         />
