@@ -37,6 +37,7 @@ import atlasRoutes from './routes/atlas';
 import memoriesRoutes from './routes/memories/unified';
 import notificationRoutes from './routes/notifications';
 import shareRoutes from './routes/share';
+import flightsRoutes from './routes/flights';
 import { mcpHandler } from './mcp';
 import { Addon } from './types';
 import { getPhotoProviderConfig } from './services/memories/helpersService';
@@ -260,6 +261,7 @@ export function createApp(): express.Application {
   app.use('/api/maps', mapsRoutes);
   app.use('/api/weather', weatherRoutes);
   app.use('/api/settings', settingsRoutes);
+  app.use('/api/flights', flightsRoutes);
   app.use('/api/backup', backupRoutes);
   app.use('/api/notifications', notificationRoutes);
   app.use('/api', shareRoutes);
