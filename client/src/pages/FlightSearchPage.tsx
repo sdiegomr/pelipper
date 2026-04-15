@@ -1,5 +1,5 @@
 // client/src/pages/FlightSearchPage.tsx
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plane } from 'lucide-react'
 import Navbar from '../components/Layout/Navbar'
 import { SearchForm } from '../components/FlightSearch/SearchForm'
@@ -28,10 +28,10 @@ export default function FlightSearchPage() {
   })
   const [sort, setSort] = useState<SortOption>('cheapest')
   const [addToTripOffer, setAddToTripOffer] = useState<FlightOffer | null>(null)
-  const [addedCount, setAddedCount] = useState(0)
+  const [showAddedToast, setShowAddedToast] = useState(false)
 
   // Reset max price filter when new results arrive
-  useMemo(() => {
+  useEffect(() => {
     if (offers.length > 0) {
       setFilters(f => ({ ...f, maxPrice: getMaxPrice(offers) }))
     }
@@ -120,11 +120,14 @@ export default function FlightSearchPage() {
         <AddToTripModal
           offer={addToTripOffer}
           onClose={() => setAddToTripOffer(null)}
-          onAdded={() => setAddedCount(c => c + 1)}
+          onAdded={() => {
+            setShowAddedToast(true)
+            setTimeout(() => setShowAddedToast(false), 3000)
+          }}
         />
       )}
 
-      {addedCount > 0 && (
+      {showAddedToast && (
         <div className="fixed bottom-4 right-4 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm px-4 py-2 rounded-lg shadow-lg">
           Flight added to trip
         </div>
