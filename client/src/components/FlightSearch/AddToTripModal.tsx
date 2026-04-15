@@ -39,14 +39,20 @@ export function AddToTripModal({ offer, onClose, onAdded }: AddToTripModalProps)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/trips', { credentials: 'include' })
+    const controller = new AbortController()
+    fetch('/api/trips', { credentials: 'include', signal: controller.signal })
       .then(r => r.json())
       .then(data => {
         const list: Trip[] = data.trips || []
         setTrips(list)
         if (list.length > 0) setSelectedTripId(list[0].id)
       })
-      .catch(() => {})
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          setError('Could not load your trips.')
+        }
+      })
+    return () => controller.abort()
   }, [])
 
   const itinerary = offer.itineraries[0]
@@ -97,8 +103,8 @@ export function AddToTripModal({ offer, onClose, onAdded }: AddToTripModalProps)
       }
       onAdded()
       onClose()
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setSaving(false)
     }
