@@ -55,17 +55,22 @@ router.post('/search', authenticate, async (req: Request, res: Response) => {
 // GET /api/flights/preferences
 router.get('/preferences', authenticate, (req: Request, res: Response) => {
   const authReq = req as AuthRequest;
-  const pref = db.prepare('SELECT * FROM flight_preferences WHERE user_id = ?').get(authReq.user.id) as any;
-  if (!pref) {
-    return res.json({ preferences: { cabin_class: 'ECONOMY', max_stops: 2, preferred_airlines: [] } });
+  try {
+    const pref = db.prepare('SELECT * FROM flight_preferences WHERE user_id = ?').get(authReq.user.id) as any;
+    if (!pref) {
+      return res.json({ preferences: { cabin_class: 'ECONOMY', max_stops: 2, preferred_airlines: [] } });
+    }
+    res.json({
+      preferences: {
+        cabin_class: pref.cabin_class,
+        max_stops: pref.max_stops,
+        preferred_airlines: JSON.parse(pref.preferred_airlines || '[]'),
+      },
+    });
+  } catch (err) {
+    console.error('[flights] preferences read error:', err);
+    res.status(500).json({ error: 'Failed to read preferences' });
   }
-  res.json({
-    preferences: {
-      cabin_class: pref.cabin_class,
-      max_stops: pref.max_stops,
-      preferred_airlines: JSON.parse(pref.preferred_airlines || '[]'),
-    },
-  });
 });
 
 // PUT /api/flights/preferences
@@ -84,22 +89,26 @@ router.put('/preferences', authenticate, (req: Request, res: Response) => {
     return res.status(400).json({ error: 'preferred_airlines must be an array' });
   }
 
-  db.prepare(`
-    INSERT INTO flight_preferences (user_id, cabin_class, max_stops, preferred_airlines, updated_at)
-    VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    ON CONFLICT(user_id) DO UPDATE SET
-      cabin_class = excluded.cabin_class,
-      max_stops = excluded.max_stops,
-      preferred_airlines = excluded.preferred_airlines,
-      updated_at = CURRENT_TIMESTAMP
-  `).run(
-    authReq.user.id,
-    cabin_class || 'ECONOMY',
-    max_stops !== undefined ? max_stops : 2,
-    JSON.stringify(preferred_airlines || []),
-  );
-
-  res.json({ success: true });
+  try {
+    db.prepare(`
+      INSERT INTO flight_preferences (user_id, cabin_class, max_stops, preferred_airlines, updated_at)
+      VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(user_id) DO UPDATE SET
+        cabin_class = excluded.cabin_class,
+        max_stops = excluded.max_stops,
+        preferred_airlines = excluded.preferred_airlines,
+        updated_at = CURRENT_TIMESTAMP
+    `).run(
+      authReq.user.id,
+      cabin_class || 'ECONOMY',
+      max_stops !== undefined ? max_stops : 2,
+      JSON.stringify(preferred_airlines || []),
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[flights] preferences write error:', err);
+    res.status(500).json({ error: 'Failed to save preferences' });
+  }
 });
 
 export default router;
