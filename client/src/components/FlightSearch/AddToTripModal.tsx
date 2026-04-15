@@ -22,6 +22,16 @@ function formatDuration(iso: string): string {
   return `${Math.floor(mins / 60)}h ${mins % 60 > 0 ? (mins % 60) + 'm' : ''}`.trim()
 }
 
+function buildBookingUrl(offer: FlightOffer): string {
+  const seg = offer.itineraries[0]?.segments[0]
+  if (!seg) return 'https://www.google.com/travel/flights'
+  const origin = seg.departure.iataCode
+  const segs = offer.itineraries[0].segments
+  const dest = segs[segs.length - 1]?.arrival.iataCode || ''
+  const date = seg.departure.at.slice(0, 10).replace(/-/g, '')
+  return `https://www.google.com/travel/flights?q=flights+${origin}+to+${dest}+${date}`
+}
+
 export function AddToTripModal({ offer, onClose, onAdded }: AddToTripModalProps) {
   const [trips, setTrips] = useState<Trip[]>([])
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null)
@@ -61,7 +71,7 @@ export function AddToTripModal({ offer, onClose, onAdded }: AddToTripModalProps)
       cabin_class: offer.travelerPricings?.[0]?.fareDetailsBySegment?.[0]?.cabin || 'ECONOMY',
       price: parseFloat(offer.price.total),
       currency: offer.price.currency,
-      booking_url: `https://www.google.com/travel/flights`,
+      booking_url: buildBookingUrl(offer),
       amadeus_offer_id: offer.id,
     }
 
