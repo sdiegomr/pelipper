@@ -864,6 +864,20 @@ function runMigrations(db: Database.Database): void {
         for (const d of matchingDays) ins.run(r.id, d.id, r.day_plan_position);
       }
     },
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS flight_preferences (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          cabin_class TEXT NOT NULL DEFAULT 'ECONOMY',
+          max_stops INTEGER NOT NULL DEFAULT 2,
+          preferred_airlines TEXT NOT NULL DEFAULT '[]',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id)
+        )
+      `);
+    },
   ];
 
   if (currentVersion < migrations.length) {
